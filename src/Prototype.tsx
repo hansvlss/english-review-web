@@ -63,12 +63,24 @@ const IPA_ENDPOINT = import.meta.env.VITE_IPA_ENDPOINT ?? "";
 const LOCAL_USER_ID = "local-test-user";
 const DAY_MS = 86_400_000;
 const TYPE_LABELS: Record<EntryType, string> = { word: "单词", phrase: "词组", sentence: "句子" };
+const ROUTE_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 const LOCAL_IPA: Record<string, string> = {
   resilient: "/rɪˈzɪliənt/",
   "follow through": "/ˌfɑːloʊ ˈθruː/",
   clarify: "/ˈklerəfaɪ/",
   "trade-off": "/ˈtreɪd ɔːf/",
 };
+
+function currentRoute() {
+  const pathname = ROUTE_BASE && location.pathname.startsWith(ROUTE_BASE)
+    ? location.pathname.slice(ROUTE_BASE.length) || "/"
+    : location.pathname;
+  return (pathname === "/" ? "/today" : pathname) + location.search;
+}
+
+function browserPath(route: string) {
+  return `${ROUTE_BASE}${route}`;
+}
 
 function makeId(prefix: string) {
   const value = typeof crypto.randomUUID === "function"
@@ -410,7 +422,7 @@ function AccountScreen({ data, navigate, logout }: { data: AppData; navigate: Na
 export default function Prototype() {
   const keyboard = useKeyboard();
   const [data, setDataState] = useState<AppData>(initialData);
-  const [path, setPath] = useState(() => location.pathname === "/" ? "/today" : location.pathname + location.search);
+  const [path, setPath] = useState(currentRoute);
   const [toastMessage, setToastMessage] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Entry | null>(null);
   const [reviewIds, setReviewIds] = useState<string[]>([]);
@@ -426,7 +438,7 @@ export default function Prototype() {
   function toast(message: string) { setToastMessage(message); window.setTimeout(() => setToastMessage(""), 2600); }
   function navigate(nextPath: string) {
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-    keyboard.hide(); history.pushState({}, "", nextPath); setPath(nextPath);
+    keyboard.hide(); history.pushState({}, "", browserPath(nextPath)); setPath(nextPath);
     requestAnimationFrame(() => document.querySelector<HTMLElement>(".mobile-scroll")?.scrollTo({ top: 0 }));
     if (nextPath === "/review") {
       setReviewIds(data.entries.filter((entry) => isDue(entry.review.dueAt)).sort((a, b) => a.review.dueAt.localeCompare(b.review.dueAt)).map((entry) => entry.id));
@@ -434,8 +446,8 @@ export default function Prototype() {
     }
   }
   useEffect(() => {
-    if (location.pathname === "/") history.replaceState({}, "", "/today");
-    const pop = () => setPath(location.pathname + location.search);
+    if (currentRoute() === "/today" && !location.pathname.endsWith("/today")) history.replaceState({}, "", browserPath("/today"));
+    const pop = () => setPath(currentRoute());
     window.addEventListener("popstate", pop); return () => window.removeEventListener("popstate", pop);
   }, []);
   useEffect(() => {
